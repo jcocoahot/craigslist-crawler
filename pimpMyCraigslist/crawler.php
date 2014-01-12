@@ -10,11 +10,11 @@ $STDERR = fopen(dirname(__FILE__) . '/error.log', 'wb');
 
 include_once("simple_html_dom.php");
 include_once("PointLocation.php");
-$filename = "post_ids.txt";
+$filename = dirname(__FILE__) . "/post_ids.txt";
 $craigslist_url = "http://losangeles.craigslist.org";
 
 // Create DOM from URL
-$html = file_get_html("http://losangeles.craigslist.org/search/apa/lac?catAbb=apa&query=&zoomToPosting=&minAsk=&maxAsk=1300&bedrooms=1&sort=date&housing_type=#grid");
+$html = file_get_html("http://losangeles.craigslist.org/search/apa?catAbb=apa&maxAsk=1500&sort=date#grid");
 
 //search polygon
 $polygon = array("33.995039 -118.395565", "34.005001 -118.420799", "34.033599 -118.431957", "34.037582 -118.40123", "34.055362 -118.376682", "34.047824 -118.359001", "34.036586 -118.354366", "34.020226 -118.372048", "33.995039 -118.395565");
