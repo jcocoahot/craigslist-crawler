@@ -7,31 +7,91 @@ $STDIN = fopen('/dev/null', 'r');
 $STDOUT = fopen(dirname(__FILE__) . '/application.log', 'wb');
 $STDERR = fopen(dirname(__FILE__) . '/error.log', 'wb');
 
+//error log func
+function err($str) {
+	global $STDERR;
+	fwrite($STDERR, "\n".$str); 
+}
 
-include_once("simple_html_dom.php");
-include_once("PointLocation.php");
+require_once("simple_html_dom.php");
+require_once("PointLocation.php");
 $filename = dirname(__FILE__) . "/post_ids.txt";
-$craigslist_url = "http://losangeles.craigslist.org";
 
-// Create DOM from URL
-$html = file_get_html("http://losangeles.craigslist.org/search/apa?catAbb=apa&maxAsk=1500&sort=date#grid");
+//Checking CLI
+if (PHP_SAPI != "cli" && PHP_SAPI != "cgi-fcgi") {
+    err("This script must be ran from the command line. Exiting...");
+    exit(1);
+}
 
-//search polygon
-$polygon = array("33.995039 -118.395565", "34.005001 -118.420799", "34.033599 -118.431957", "34.037582 -118.40123", "34.055362 -118.376682", "34.047824 -118.359001", "34.036586 -118.354366", "34.020226 -118.372048", "33.995039 -118.395565");
-//Init array of postings
-$postings = array();
+//Validation
+
+if ($argc < 4) {
+	err("Wrong number of arguments.");
+	err("Usage php crawler.php {emails} {search query} {bounding polygon} ");
+	err("e.g: php crawler.php 'antoineb19+housingsearch@gmail.com'".
+			" 'http://losangeles.craigslist.org/search/apa?catAbb=apa&maxAsk=1500&sort=date#grid'".
+			" '33.995039 -118.395565,34.005001 -118.420799,34.033599 -118.431957,34.037582 -118.40123,34.055362 -118.376682,34.047824 -118.359001,34.036586 -118.354366,34.020226 -118.372048,33.995039 -118.395565'");
+	exit(1);
+} 
+
+if (!$argv) {
+	err("Error occured with the arguments");
+	exit(1);
+}
+
+$emails = $argv[1];
+$search_query = $argv[2];
+$bounding_polygon = $argv[3];
+
+if (filter_var($search_query, FILTER_VALIDATE_URL) == false) {
+	err("Invalid search query, please enter a valid url");
+	exit(1);
+}
+
+$emails_arr = explode(",",$emails);
+foreach ($emails_arr as $email) {
+	if (filter_var($email, FILTER_VALIDATE_EMAIL) == false) {
+		err("Invalid email, please enter a valid email for ". $email);
+		exit(1);
+	}
+}
+
+$bounding_polygon_arr = explode(",", $bounding_polygon);
+if (count($bounding_polygon_arr) < 3) {
+	err("The bounding polygon must be a polygon...");
+	exit(1);
+}
+if ($bounding_polygon_arr[0] != end($bounding_polygon_arr)) {
+	err("Please make sure the bouding polygon is closed.");
+	exit(1);
+}
+
+
+//Start
+
 
 /*
 * LOGIC:
-	we open file and store all the ids in an array 
-	we crawl the first 100 items on the page
-	for every match inside the bounds 
-	we try to find a match in the array 
-	if its not there we add that element to the array
-	and we send an email 
-	at the end we save back all the ids into the same file
+	1.we open/read text file and store all the ids in an array 
+	2.we crawl the first 100 items on the page
+	  for every match inside the bounds 
+	  we try to find a match in the array 
+	  if its not there we add that element to our results
+	3. we mail the results 
+	4. and at the end we save back all the ids into the file
 *
 */
+
+
+
+//search polygon
+$polygon = $bounding_polygon_arr;
+//Init array of postings
+$postings = array();
+
+
+
+//1.
 
 $previous_postings = array();
 if (file_exists($filename)) {
@@ -39,6 +99,10 @@ if (file_exists($filename)) {
 	$previous_postings = file($filename, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 }
 
+//2.
+
+// Create DOM from URL
+$html = file_get_html($search_query);
 // Search all p tags  
 foreach($html->find('p') as $element) {
 	//check if the element has already been processed
@@ -90,17 +154,19 @@ $pointLocation = new pointLocation();
 foreach ($postings as $post) {
 	$point = $post['latitude'] . " " . $post['longitude'];
 	if ($pointLocation->pointInPolygon($point, $polygon) != "outside") {
-		echo "\n Within bounds " . $post['href'];
+		echo "\n Within bounds " . $post['href']. " - latitude: ". $post['latitude'] . "  longitude: ". $post['longitude'];
 		$valid_postings[] = $post;
 	} else {
-		echo "\n Outside bounds " . $post['href'];
+		echo "\n Outside bounds " . $post['href']. " - latitude: ". $post['latitude'] . "  longitude: ". $post['longitude'];
 	}
 }
 
 
-//Mail
-// multiple recipients
-$to  = 'antoineb19+housingsearch@gmail.com' ; 
+//3.
+
+//Mail the results 
+// for multiple recipients, its comma separated
+$to  = $emails ; 
 
 foreach ($valid_postings as $posting) {
 	// subject
@@ -135,14 +201,13 @@ foreach ($valid_postings as $posting) {
 }
 
 
-
+//4.
 
 //Append the valid postings to the file
-
 // The file pointer is at the bottom of the file 
 if (!$handle = fopen($filename, 'a+')) {
-     echo "\n Cannot open file ($filename)";
-     exit;
+     err("Cannot open file ($filename)");
+     exit(2);
 } else {
 
 	foreach ($valid_postings as $key => $posting) {
@@ -150,8 +215,8 @@ if (!$handle = fopen($filename, 'a+')) {
 
 	    // Write $somecontent to our opened file.
 	    if (fwrite($handle, $line) === FALSE) {
-	        echo "\n Cannot write to file ($filename)";
-	        exit;
+	        err("Cannot write to file ($filename)");
+	        exit(2);
 	    }
 	}
 
@@ -159,9 +224,3 @@ if (!$handle = fopen($filename, 'a+')) {
 
 	fclose($handle);
 }
-
-
-
-
-
-
