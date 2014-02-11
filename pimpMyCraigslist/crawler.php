@@ -83,7 +83,8 @@ if ($bounding_polygon_arr[0] != end($bounding_polygon_arr)) {
 */
 
 
-
+$url = parse_url($search_query);
+$host = $url['host'];
 //search polygon
 $polygon = $bounding_polygon_arr;
 //Init array of postings
@@ -185,7 +186,7 @@ foreach ($valid_postings as $posting) {
 	      <th>Picture</th><th>Link</th><th>Price</th>
 	    </tr>
 	    <tr>
-	      <td><img src="'.$posting['img'].'"/></td><td>'.$posting['href'].'</td><td>'.$posting['price'].'</td>
+	      <td><img src="'.$posting['img'].'"/></td><td><a href="http://'.$host.$posting['href'].'">link</a></td><td>'.$posting['price'].'</td>
 	    </tr>
 	  </table>
 	</body>
