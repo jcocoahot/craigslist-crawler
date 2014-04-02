@@ -85,6 +85,8 @@ if ($bounding_polygon_arr[0] != end($bounding_polygon_arr)) {
 
 $url = parse_url($search_query);
 $host = $url['host'];
+$scheme = $url['scheme'];
+$craigslist_url = $url['scheme'] ."://".$url['host'];
 //search polygon
 $polygon = $bounding_polygon_arr;
 //Init array of postings
@@ -111,6 +113,8 @@ foreach($html->find('p') as $element) {
 		if (in_array($element->{'data-pid'}, $previous_postings)) {
 			echo "\n" . $element->{'data-pid'} . " has already been processed";
 			continue;
+		} else {
+			echo "\n Detected a new posting with id : " . $element->{'data-pid'};
 		}
 	} else {
 		echo "\n data-pid is not isset";
@@ -118,12 +122,37 @@ foreach($html->find('p') as $element) {
 	}
 
 
-	if (isset($element->{'data-latitude'}) && isset($element->{'data-latitude'})) {
-		$new_posting = array();
-		$new_posting['latitude'] = $element->{'data-latitude'};
-		$new_posting['longitude'] = $element->{'data-longitude'};
-		$new_posting['id'] = $element->{'data-pid'};
-		
+	//first let get the link
+	$new_posting = array();
+	$new_posting['id'] = $element->{'data-pid'};
+	$new_posting['href'] = $element->find('a', 1) && isset($element->find('a', 1)->href) ? $craigslist_url . $element->find('a', 1)->href : null;
+
+	if ($new_posting['href'] == null) {
+		echo "\n No link for posting id: ". $new_posting['id'];
+		continue;
+	}
+	//add random sleep between 2 and 4 sec
+	sleep(rand(0.5, 1.5));
+	//then get the posting html
+	$html_posting = file_get_html($new_posting['href']);
+	//search for lat and long
+	foreach ($html_posting->find('div[data-latitude]') as $elt) {
+		//if found add to posting attributes
+		if (!isset($elt->{'data-latitude'}) || !isset($elt->{'data-longitude'})) {
+			echo "\n No lat or long for posting id ". $new_posting['id'];
+			break;
+		} 
+
+		$new_posting['latitude'] = $elt->{'data-latitude'};
+		$new_posting['longitude'] = $elt->{'data-longitude'};
+	}
+
+	foreach ($html_posting->find('#postingbody') as $elt) {
+		$new_posting['description'] = $elt->innertext;
+		break;
+	}
+
+	if (isset($new_posting['latitude'])) {
 		//extract title of the posting (2nd a element inside the p)
 		if ($element->find('a', 1)) {
 			$new_posting['title'] = $element->find('a', 1)->innertext;
@@ -136,29 +165,34 @@ foreach($html->find('p') as $element) {
 
 		//inside or p post tag , search for the links that have the class=i
 		foreach ($element->find('a.i') as $a) {
-			if (isset($a->href)) {
-				$new_posting['href'] = $craigslist_url . $a->href;
-			} 
-
 			if (isset($a->{'data-id'})) {
 				$new_posting['img'] = "http://images.craigslist.org/" . str_replace('0:', '', $a->{'data-id'}) . "_300x300.jpg";
 			}
 		}
+		//and add to the array of postings
 		$postings[] = $new_posting;
 	}
+	echo "\n";
+	print_r($new_posting);
 }
 
 $valid_postings = array();
 //Once we have the new postings
 //Let's check if there are within the bounds of our perimeter
 $pointLocation = new pointLocation();
-foreach ($postings as $post) {
-	$point = $post['latitude'] . " " . $post['longitude'];
-	if ($pointLocation->pointInPolygon($point, $polygon) != "outside") {
-		echo "\n Within bounds " . $post['href']. " - latitude: ". $post['latitude'] . "  longitude: ". $post['longitude'];
-		$valid_postings[] = $post;
-	} else {
-		echo "\n Outside bounds " . $post['href']. " - latitude: ". $post['latitude'] . "  longitude: ". $post['longitude'];
+echo "\n Number of potential postings found: ".count($postings);
+if (count($postings) > 0) {
+	echo "\n Let's check if these postings are within the bounds of he perimeter.";
+	foreach ($postings as $post) {
+		$point = $post['latitude'] . " " . $post['longitude'];
+		if ($pointLocation->pointInPolygon($point, $polygon) != "outside") {
+			echo "\n Detected a location within bounds " . $post['href']. " - latitude: ". $post['latitude'] . "  longitude: ". $post['longitude'];
+			$valid_postings[] = $post;
+		}
+	}
+
+	if (count($valid_postings) <= 0) {
+		echo "\n All the ".count($postings)." locations were outside the bounds for the given parameter. You might want to choose a bigger perimeter?";
 	}
 }
 
@@ -186,7 +220,16 @@ foreach ($valid_postings as $posting) {
 	      <th>Picture</th><th>Link</th><th>Price</th>
 	    </tr>
 	    <tr>
-	      <td><img src="'.$posting['img'].'"/></td><td><a href="http://'.$host.$posting['href'].'">link</a></td><td>'.$posting['price'].'</td>
+	      <td><img src="'.$posting['img'].'"/></td><td><a href="'.$posting['href'].'">link</a></td><td>'.$posting['price'].'</td>
+	    </tr>
+	  </table>
+	  <br><br>
+	  <table>
+	    <tr>
+	      <th>Description</th>
+	    </tr>
+	    <tr>
+	      <td>'.$posting['description'].'</td>
 	    </tr>
 	  </table>
 	</body>
