@@ -42,6 +42,7 @@ if (!$argv) {
 $emails = $argv[1];
 $search_query = $argv[2];
 $bounding_polygon = $argv[3];
+$email_subject_prefix = isset($argv[4]) ? $argv[4] : "NONAME";
 
 if (filter_var($search_query, FILTER_VALIDATE_URL) == false) {
 	err("Invalid search query, please enter a valid url");
@@ -196,7 +197,6 @@ if (count($postings) > 0) {
 	}
 }
 
-
 //3.
 
 //Mail the results 
@@ -205,8 +205,9 @@ $to  = $emails ;
 
 foreach ($valid_postings as $posting) {
 	// subject
-	$subject = 'CRAIGSLIST SCRIPT: ' . $posting['title'];
+	$subject = 'CRAIGSLIST SCRIPT - '.$email_subject_prefix.' - : ' . $posting['title'];
 
+	$map = "http://maps.google.com/maps/api/staticmap?center=".$posting['latitude'].",".$posting['longitude']."&zoom=13&markers=".$posting['latitude'].",".$posting['longitude']."&size=500x300&sensor=false";
 	// message
 	$message = '
 	<html>
@@ -224,6 +225,14 @@ foreach ($valid_postings as $posting) {
 	    </tr>
 	  </table>
 	  <br><br>
+	  <table>
+	    <tr>
+	      <th>Map</th>
+	    </tr>
+	    <tr>
+	      <td><img src="'.$map.'"/></td>
+	    </tr>
+	  </table>
 	  <table>
 	    <tr>
 	      <th>Description</th>
