@@ -43,6 +43,8 @@ $emails = $argv[1];
 $search_query = $argv[2];
 $bounding_polygon = $argv[3];
 $email_subject_prefix = isset($argv[4]) ? $argv[4] : "NONAME";
+//changing the filename for tagged searches so it doesnt conflict
+$filename = str_replace(".txt", "_" . $email_subject_prefix . ".txt", $filename);
 
 if (filter_var($search_query, FILTER_VALIDATE_URL) == false) {
 	err("Invalid search query, please enter a valid url");
