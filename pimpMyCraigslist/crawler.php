@@ -109,6 +109,11 @@ if (file_exists($filename)) {
 
 // Create DOM from URL
 $html = file_get_html($search_query);
+
+if (!$html) {
+	err("$search_query seems unreachable.");
+	exit(1);
+}
 // Search all p tags  
 foreach($html->find('p') as $element) {
 	//check if the element has already been processed
@@ -153,6 +158,13 @@ foreach($html->find('p') as $element) {
 	foreach ($html_posting->find('#postingbody') as $elt) {
 		$new_posting['description'] = $elt->innertext;
 		break;
+	}
+
+	foreach ($html_posting->find('time') as $elt) {
+		if (isset($elt->{'datetime'})) {
+			$new_posting['posted-date'] = $elt->{'datetime'};
+			break;
+		}
 	}
 
 	if (isset($new_posting['latitude'])) {
@@ -220,10 +232,10 @@ foreach ($valid_postings as $posting) {
 	  <p>'.$posting['title'].'</p>
 	  <table>
 	    <tr>
-	      <th>Picture</th><th>Link</th><th>Price</th>
+	      <th>Picture</th><th>Link</th><th>Price</th><th>Posted date</th>
 	    </tr>
 	    <tr>
-	      <td><img src="'.$posting['img'].'"/></td><td><a href="'.$posting['href'].'">link</a></td><td>'.$posting['price'].'</td>
+	      <td><img src="'.$posting['img'].'"/></td><td><a href="'.$posting['href'].'">link</a></td><td>'.$posting['price'].'</td><td>'.$posting['posted_date'].'</td>
 	    </tr>
 	  </table>
 	  <br><br>
